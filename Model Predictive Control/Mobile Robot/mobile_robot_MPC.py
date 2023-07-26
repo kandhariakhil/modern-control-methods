@@ -92,22 +92,22 @@ obj = 0 # Objective function
 g = [] # constraints vector
 
 # Q and R are diagonal matrices used to tune the controller
-Q = np.zeros((n_states,n_states))
-Q[0,0] = 1.0 
-Q[1,1] = 5.0
-Q[2,2] = 0.1
+Q11 = 1.0 
+Q22 = 5.0
+Q33 = 0.1
+Q = ca.diagcat(Q11,Q22,Q33)
 
-R = np.zeros((n_controls,n_controls))
-R[0,0] = 0.5 
-R[1,1] = 0.05
+R11 = 0.5 
+R22 = 0.05
+R = ca.diagcat(R11,R22)
 
 for k in range(N):
     st = X[:,k]
     con = U[:,k]
     # Note: Casadi multiplication is using mtimes and the .T transposes the array
     # P0,P1,P2 - stores the initial state and P3,P4,P5 stores the reference state
-    obj += ca.mtimes(ca.mtimes(st.T-P[3:6].T,Q),st-P[3:6]) + ca.mtimes(ca.mtimes(con.T,R),con) # Objective function summation over N iterations
-    
+    # obj += ca.mtimes(ca.mtimes((st-P[3:6])T,Q),st-P[3:6]) + ca.mtimes(ca.mtimes(con.T,R),con) # Objective function summation over N iterations
+    obj += (st-P[N:]).T @ Q @ (st-P[N:])+con.T @ R @ con # @ represents matrix mulitiplication (ca.mtimes)
 
 # Compute constraints - box constraints due to map margins (x,y) -> cannot be outside of map margins
 for k in range(N+1):
@@ -116,7 +116,8 @@ for k in range(N+1):
 
 # Defining the non-linear programming structure
 
-opt_variables = ca.reshape(U,2*N,1) # Reshape U from a 2D array to a vector using Casadi reshape
+opt_variables = ca.vertcat(U.reshape((-1,1))) # Reshape U from a 2D array to a vector using Casadi reshape
+
 nlp_prob = {
     'f':obj,
     'x':opt_variables,
