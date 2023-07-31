@@ -203,8 +203,10 @@ if __name__ == '__main__':
         # Extract the control input
         u = ca.reshape(sol['x'],n_controls,N) # Reshape from vector to matrix
         # Compute optimal solution trajectory
-
-        ff_value = ff(u.T.reshape(2,N), args['p'])
+        # Compute state given new control input
+        print(u)
+        print(ff)
+        ff_value = ff(u, args['p'])
 
         cat_controls = np.vstack((
             cat_controls,
