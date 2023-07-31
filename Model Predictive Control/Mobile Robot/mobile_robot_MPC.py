@@ -5,7 +5,15 @@ import numpy as np
 import time
 from math import *
 
-from draw_sim import Draw_MPC_point_stabilization
+from draw_sim import simulate
+
+#Initial and Final states
+x_init = 0
+y_init = 0
+theta_init = 0
+x_target = 1.5
+y_target = 1.5
+theta_target = 0
 
 def shift_timestep(step_horizon, t0, state_init, u, f):
     f_value = f(state_init, u[:, 0])
@@ -19,6 +27,8 @@ def shift_timestep(step_horizon, t0, state_init, u, f):
 
     return t0, next_state, u0
 
+def DM2Arr(dm):
+    return np.array(dm.full())
 # Setting up simulation parameters:
 
 T = 0.2 # Sampling time in seconds
@@ -152,58 +162,86 @@ args['ubx'][1::2] = [omega_max]*N
 
 # Simulation Loop
 t0 = 0
-x0 = np.array([0,0,0.0]) #Initial condition
-xs = np.array([1.5,1.5,0]) #Reference position
-xx = np.zeros((3,N+1))
-t = np.zeros(N+1)
-xx[:,0] = x0
-t[0] = t0
-u0 = np.zeros((N,2)) # Two control inputs
+
+#DM is a dense matrix which is a 2D array with arbitrary dimensions and a fixed data type
+x0 = ca.DM([x_init,y_init,theta_init])
+xs = ca.DM([x_target, y_target, theta_target])
+
+t = ca.DM(t0)
+u0 = ca.DM.zeros((n_controls,N)) #Initial control - Is Nxn_controls in video lecture
+X0 = ca.repmat(x0,1,N+1) #Initial state full
+
 sim_time = 20 #Maximum simulation time
 
 #Start MPC
-mpciter = 0
-xx1 = []
-u_cl = []
+mpc_iter = 0
+cat_states = DM2Arr(X0) #Store predicted state 
+cat_controls = DM2Arr(u0[:,0]) # Store control actions
+times = np.array([[0]])
 
-main_loop = time.time()
-while (np.linalg.norm(x0- xs, 2) > 1e-1) and mpciter < sim_time/T:
-    # args['p'] = np.concatenate((x0,xs)) # Set the values of the paremeters vector
-    # args['x0'] = u0.flatten() #Initial value of the optimization variables
 
-    args['p'] = ca.vertcat(
-        x0,    # current state
-        xs   # target state
-        )
-        # optimization variable current state
-    args['x0'] = np.array(u0.T).flatten()
-    sol = solver(x0=args['x0'], lbx = args['lbx'], ubx = args['ubx'], lbg = args['lbg'], ubg = args['ubg'], p= args['p'])
-    # sol = (**args)
+if __name__ == '__main__':
+    main_loop = time.time()
+    while (ca.norm_2(x0-xs) > 1e-1) and mpc_iter < sim_time/T:
+        t1 = time.time()
+        args['p'] = ca.vertcat(
+            x0,    # current state
+            xs     # target state
+            )
+        
+        # optimization variable current state as a 1D vector
+        args['x0'] = ca.reshape(u0,n_controls*N,1)
 
-    # Extract the control input
-    u = np.reshape(sol['x'], (N,2)).T
 
-    # Compute optimal solution trajectory
-    # Todo: Understand the following line
-    ff_value = ff(u.T.reshape(2,N), args['p'])
+        sol = solver(x0=args['x0'], 
+                    lbx = args['lbx'], 
+                    ubx = args['ubx'], 
+                    lbg = args['lbg'], 
+                    ubg = args['ubg'], 
+                    p= args['p'])
+        
+        # Extract the control input
+        u = ca.reshape(sol['x'],n_controls,N) # Reshape from vector to matrix
+        # Compute optimal solution trajectory
 
-    xx1.append(ff_value.full().T)
-    u_cl = np.concatenate((u_cl,u[0]), axis=0) # Storing control actions
+        ff_value = ff(u.T.reshape(2,N), args['p'])
 
-    t = ca.vertcat(
+        cat_controls = np.vstack((
+            cat_controls,
+            DM2Arr(u[:, 0])
+        ))
+
+        t = np.vstack((
             t,
             t0
+        ))
+        t0, x0, u0 = shift_timestep(T, t0, x0, u, f)
+
+        # print(X0)
+        X0 = ca.horzcat(
+            X0[:, 1:],
+            ca.reshape(X0[:, -1], -1, 1)
         )
 
-    # Get the initialization of the next optimization step
-    t0, x0, u0 = shift_timestep(T, t0, x0, u, f)
-    xx[:,mpciter+1] = (x0).flatten()
+        # xx ...
+        t2 = time.time()
+        print(mpc_iter)
+        print(t2-t1)
+        times = np.vstack((
+            times,
+            t2-t1
+        ))
 
-    mpciter += 1
+        mpc_iter = mpc_iter + 1
 
-main_loop_time = time.time() - main_loop
+    main_loop_time = time.time()
+    ss_error = ca.norm_2(x0 - xs)
 
-ss_error = np.linalg.norm(x0 - xs, 2)
+    print('\n\n')
+    print('Total time: ', main_loop_time - main_loop)
+    print('avg iteration time: ', np.array(times).mean() * 1000, 'ms')
+    print('final error: ', ss_error)
 
-Draw_MPC_point_stabilization(t, xx, np.array(xx1), u_cl, xs, N, rob_diam)  # a drawing function
-
+    # simulate
+    simulate(cat_states, cat_controls, times, x0, N,
+            np.array([x_init, y_init, theta_init, x_target, y_target, theta_target]), save=False)

@@ -1,72 +1,94 @@
+import numpy as np 
+from numpy import sin, cos, pi
 import matplotlib.pyplot as plt
-import numpy as np
+from matplotlib import animation
+from time import time
 
-def Draw_MPC_point_stabilization(t, xx, xx1, u_cl, xs, N, rob_diam):
-    line_width = 1.5
-    fontsize_labels = 14
 
-    # Simulate robots
-    x_r_1 = []
-    y_r_1 = []
+def simulate(cat_states, cat_controls, t, step_horizon, N, reference, save=False):
+    def create_triangle(state=[0,0,0], h=1, w=0.5, update=False):
+        x, y, th = state
+        triangle = np.array([
+            [h, 0   ],
+            [0,  w/2],
+            [0, -w/2],
+            [h, 0   ]
+        ]).T
+        rotation_matrix = np.array([
+            [cos(th), -sin(th)],
+            [sin(th),  cos(th)]
+        ])
 
-    r = rob_diam / 2  # obstacle radius
-    ang = 0.0
-    xp = []
-    yp = []
-    while ang < 2 * np.pi:
-        xp.append(r * np.cos(ang))
-        yp.append(r * np.sin(ang))
-        ang += 0.005
+        coords = np.array([[x, y]]) + (rotation_matrix @ triangle).T
+        if update == True:
+            return coords
+        else:
+            return coords[:3, :]
 
-    fig = plt.figure(500)
-    fig.set_size_inches(10, 10)
-    plt.subplots_adjust(left=0.1, right=0.95, top=0.95, bottom=0.1)
+    def init():
+        return path, horizon, current_state, target_state,
 
-    for k in range(xx.shape[1]):
-        h_t = 0.14
-        w_t = 0.09
+    def animate(i):
+        # get variables
+        x = cat_states[0, 0, i]
+        y = cat_states[1, 0, i]
+        th = cat_states[2, 0, i]
 
-        x1 = xs[0]
-        y1 = xs[1]
-        th1 = xs[2]
-        x1_tri = [x1 + h_t * np.cos(th1), x1 + (w_t / 2) * np.cos((np.pi / 2) - th1), x1 - (w_t / 2) * np.cos((np.pi / 2) - th1)]
-        y1_tri = [y1 + h_t * np.sin(th1), y1 - (w_t / 2) * np.sin((np.pi / 2) - th1), y1 + (w_t / 2) * np.sin((np.pi / 2) - th1)]
-        plt.fill(x1_tri, y1_tri, 'g')
+        # update path
+        if i == 0:
+            path.set_data(np.array([]), np.array([]))
+        x_new = np.hstack((path.get_xdata(), x))
+        y_new = np.hstack((path.get_ydata(), y))
+        path.set_data(x_new, y_new)
 
-        x1 = xx[0, k, 0]
-        y1 = xx[1, k, 0]
-        th1 = xx[2, k, 0]
-        x_r_1.append(x1)
-        y_r_1.append(y1)
-        x1_tri = [x1 + h_t * np.cos(th1), x1 + (w_t / 2) * np.cos((np.pi / 2) - th1), x1 - (w_t / 2) * np.cos((np.pi / 2) - th1)]
-        y1_tri = [y1 + h_t * np.sin(th1), y1 - (w_t / 2) * np.sin((np.pi / 2) - th1), y1 + (w_t / 2) * np.sin((np.pi / 2) - th1)]
+        # update horizon
+        x_new = cat_states[0, :, i]
+        y_new = cat_states[1, :, i]
+        horizon.set_data(x_new, y_new)
 
-        plt.plot(x_r_1, y_r_1, '-r', linewidth=line_width)
-        if k < xx.shape[1]:
-            plt.plot(xx1[:N, 0, k], xx1[:N, 1, k], 'r--*')
+        # update current_state
+        current_state.set_xy(create_triangle([x, y, th], update=True))
 
-        plt.fill(x1_tri, y1_tri, 'r')
-        plt.plot(x1 + xp, y1 + yp, '--r')
+        # update target_state
+        # xy = target_state.get_xy()
+        # target_state.set_xy(xy)            
 
-        plt.xlabel('$x$-position (m)', fontsize=fontsize_labels)
-        plt.ylabel('$y$-position (m)', fontsize=fontsize_labels)
-        plt.axis([-0.2, 1.8, -0.2, 1.8])
-        plt.grid(True)
-        plt.pause(0.1)
-        plt.clf()
+        return path, horizon, current_state, target_state,
 
-    plt.figure()
-    plt.subplot(211)
-    plt.stairs(t, u_cl[:, 0], 'k', linewidth=line_width)
-    plt.axis([0, t[-1], -0.35, 0.75])
-    plt.ylabel('v (rad/s)')
-    plt.grid(True)
+    # create figure and axes
+    fig, ax = plt.subplots(figsize=(6, 6))
+    min_scale = min(reference[0], reference[1], reference[3], reference[4]) - 2
+    max_scale = max(reference[0], reference[1], reference[3], reference[4]) + 2
+    ax.set_xlim(left = min_scale, right = max_scale)
+    ax.set_ylim(bottom = min_scale, top = max_scale)
 
-    plt.subplot(212)
-    plt.stairs(t, u_cl[:, 1], 'r', linewidth=line_width)
-    plt.axis([0, t[-1], -0.85, 0.85])
-    plt.xlabel('time (seconds)')
-    plt.ylabel('$\omega$ (rad/s)')
-    plt.grid(True)
+    # create lines:
+    #   path
+    path, = ax.plot([], [], 'k', linewidth=2)
+    #   horizon
+    horizon, = ax.plot([], [], 'x-g', alpha=0.5)
+    #   current_state
+    current_triangle = create_triangle(reference[:3])
+    current_state = ax.fill(current_triangle[:, 0], current_triangle[:, 1], color='r')
+    current_state = current_state[0]
+    #   target_state
+    target_triangle = create_triangle(reference[3:])
+    target_state = ax.fill(target_triangle[:, 0], target_triangle[:, 1], color='b')
+    target_state = target_state[0]
 
+    sim = animation.FuncAnimation(
+        fig=fig,
+        func=animate,
+        init_func=init,
+        frames=len(t),
+        interval=step_horizon*100,
+        blit=True,
+        repeat=True
+    )
     plt.show()
+
+    if save == True:
+        sim.save('./animation' + str(time()) +'.gif', writer='ffmpeg', fps=30)
+
+    return
+
