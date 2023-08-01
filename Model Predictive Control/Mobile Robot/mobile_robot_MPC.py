@@ -14,7 +14,7 @@ y_init = 0
 theta_init = 0
 x_target = 1.5
 y_target = 1.5
-theta_target = 0
+theta_target = ca.pi
 
 def shift_timestep(step_horizon, t0, state_init, u, f):
     f_value = f(state_init, u[:, 0])
@@ -33,7 +33,7 @@ def DM2Arr(dm):
 # Setting up simulation parameters:
 
 T = 0.2 # Sampling time in seconds
-N = 3 # Prediction horizon
+N = 15 # Prediction horizon
 sim_time = 20 #Maximum simulation time
 # Prediction time = 0.2*3 = 0.6 seconds
 rob_diam = 0.3 # Robot dimensions
@@ -43,7 +43,6 @@ v_min = -v_max
 
 omega_max = ca.pi/4
 omega_min = -omega_max
-print(omega_min)
 
 # Defining three symbols for the three states - x, y and  theta
 x = ca.SX.sym('x')
@@ -70,8 +69,8 @@ n_controls = controls.numel()
 
 # RHS of the system - 3x1 system
 rhs = ca.vertcat(
-    v*ca.sin(theta),
     v*ca.cos(theta),
+    v*ca.sin(theta),
     omega)
 
 # Nonlinear function mapping using Casadi f(x,u)
@@ -189,7 +188,6 @@ if __name__ == '__main__':
             x0,    # current state
             xs     # target state
             )
-        
         # optimization variable current state as a 1D vector
         args['x0'] = ca.reshape(u0,n_controls*N,1)
 
@@ -201,8 +199,7 @@ if __name__ == '__main__':
                     p= args['p'])
         
         # Extract the control input
-        u = ca.reshape(sol['x'],n_controls,N) # Reshape from vector to matrix
-        print(np.shape(u))
+        u = ca.reshape(sol['x'],n_controls, N)# Reshape from vector to matrix
         # Compute optimal solution trajectory
         # Compute state given new control input
         ff_value = ff(u, args['p'])
@@ -242,8 +239,8 @@ if __name__ == '__main__':
 
     main_loop_time = time.time()
     ss_error = ca.norm_2(x0 - xs)
-    control_input = ca.reshape(cat_controls,-1,2)
-    plt.plot(t,control_input[:,1])
+    control_actions = (ca.reshape(cat_controls,n_controls,-1))
+    plt.plot(t,control_actions[0,:].T)
     plt.show
     print('\n\n')
     print('Total time: ', main_loop_time - main_loop)
