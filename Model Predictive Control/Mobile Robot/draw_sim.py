@@ -2,7 +2,7 @@ import numpy as np
 from numpy import sin, cos, pi
 import matplotlib.pyplot as plt
 from matplotlib import animation
-from time import time
+from time import time, sleep
 
 
 def simulate(cat_states, cat_controls, t, step_horizon, N, reference, save=False):
@@ -52,7 +52,7 @@ def simulate(cat_states, cat_controls, t, step_horizon, N, reference, save=False
         # update target_state
         # xy = target_state.get_xy()
         # target_state.set_xy(xy)            
-
+        sleep(0.25)
         return path, horizon, current_state, target_state,
 
     # create figure and axes

@@ -4,6 +4,7 @@ import casadi as ca
 import numpy as np
 import time
 from math import *
+import matplotlib.pyplot as plt
 
 from draw_sim import simulate
 
@@ -33,6 +34,7 @@ def DM2Arr(dm):
 
 T = 0.2 # Sampling time in seconds
 N = 3 # Prediction horizon
+sim_time = 20 #Maximum simulation time
 # Prediction time = 0.2*3 = 0.6 seconds
 rob_diam = 0.3 # Robot dimensions
 
@@ -41,6 +43,7 @@ v_min = -v_max
 
 omega_max = ca.pi/4
 omega_min = -omega_max
+print(omega_min)
 
 # Defining three symbols for the three states - x, y and  theta
 x = ca.SX.sym('x')
@@ -117,7 +120,7 @@ for k in range(N):
     # Note: Casadi multiplication is using mtimes and the .T transposes the array
     # P0,P1,P2 - stores the initial state and P3,P4,P5 stores the reference state
     # obj += ca.mtimes(ca.mtimes((st-P[3:6])T,Q),st-P[3:6]) + ca.mtimes(ca.mtimes(con.T,R),con) # Objective function summation over N iterations
-    obj += (st-P[N:]).T @ Q @ (st-P[N:])+con.T @ R @ con # @ represents matrix mulitiplication (ca.mtimes)
+    obj += (st-P[n_states:]).T @ Q @ (st-P[n_states:])+con.T @ R @ con # @ represents matrix mulitiplication (ca.mtimes)
 
 # Compute constraints - box constraints due to map margins (x,y) -> cannot be outside of map margins
 for k in range(N+1):
@@ -137,7 +140,7 @@ nlp_prob = {
 
 opts = {
     'ipopt': {
-        'max_iter':1000,
+        'max_iter':100,
         'print_level':0,
         'acceptable_tol':1e-8,
         'acceptable_obj_change_tol':1e-6
@@ -171,8 +174,6 @@ t = ca.DM(t0)
 u0 = ca.DM.zeros((n_controls,N)) #Initial control - Is Nxn_controls in video lecture
 X0 = ca.repmat(x0,1,N+1) #Initial state full
 
-sim_time = 20 #Maximum simulation time
-
 #Start MPC
 mpc_iter = 0
 cat_states = DM2Arr(X0) #Store predicted state 
@@ -182,7 +183,7 @@ times = np.array([[0]])
 
 if __name__ == '__main__':
     main_loop = time.time()
-    while (ca.norm_2(x0-xs) > 1e-1) and mpc_iter < sim_time/T:
+    while (ca.norm_2(x0-xs) > 1e-2) and mpc_iter < sim_time/T:
         t1 = time.time()
         args['p'] = ca.vertcat(
             x0,    # current state
@@ -191,7 +192,6 @@ if __name__ == '__main__':
         
         # optimization variable current state as a 1D vector
         args['x0'] = ca.reshape(u0,n_controls*N,1)
-
 
         sol = solver(x0=args['x0'], 
                     lbx = args['lbx'], 
@@ -202,10 +202,9 @@ if __name__ == '__main__':
         
         # Extract the control input
         u = ca.reshape(sol['x'],n_controls,N) # Reshape from vector to matrix
+        print(np.shape(u))
         # Compute optimal solution trajectory
         # Compute state given new control input
-        print(u)
-        print(ff)
         ff_value = ff(u, args['p'])
 
         cat_controls = np.vstack((
@@ -213,10 +212,16 @@ if __name__ == '__main__':
             DM2Arr(u[:, 0])
         ))
 
+        cat_states = np.dstack((
+            cat_states,
+            DM2Arr(ff_value)
+        ))
+
         t = np.vstack((
             t,
             t0
         ))
+
         t0, x0, u0 = shift_timestep(T, t0, x0, u, f)
 
         # print(X0)
@@ -227,23 +232,23 @@ if __name__ == '__main__':
 
         # xx ...
         t2 = time.time()
-        print(mpc_iter)
-        print(t2-t1)
+
         times = np.vstack((
             times,
             t2-t1
         ))
 
-        mpc_iter = mpc_iter + 1
+        mpc_iter += 1
 
     main_loop_time = time.time()
     ss_error = ca.norm_2(x0 - xs)
-
+    control_input = ca.reshape(cat_controls,-1,2)
+    plt.plot(t,control_input[:,1])
+    plt.show
     print('\n\n')
     print('Total time: ', main_loop_time - main_loop)
     print('avg iteration time: ', np.array(times).mean() * 1000, 'ms')
     print('final error: ', ss_error)
-
     # simulate
-    simulate(cat_states, cat_controls, times, x0, N,
+    simulate(cat_states, cat_controls, times, T, N,
             np.array([x_init, y_init, theta_init, x_target, y_target, theta_target]), save=False)
