@@ -33,7 +33,7 @@ def DM2Arr(dm):
 # Setting up simulation parameters:
 
 T = 0.2 # Sampling time in seconds
-N = 15 # Prediction horizon
+N = 25 # Prediction horizon
 sim_time = 20 #Maximum simulation time
 # Prediction time = 0.2*3 = 0.6 seconds
 rob_diam = 0.3 # Robot dimensions
@@ -118,8 +118,8 @@ for k in range(N):
     con = U[:,k]
     # Note: Casadi multiplication is using mtimes and the .T transposes the array
     # P0,P1,P2 - stores the initial state and P3,P4,P5 stores the reference state
-    # obj += ca.mtimes(ca.mtimes((st-P[3:6])T,Q),st-P[3:6]) + ca.mtimes(ca.mtimes(con.T,R),con) # Objective function summation over N iterations
-    obj += (st-P[n_states:]).T @ Q @ (st-P[n_states:])+con.T @ R @ con # @ represents matrix mulitiplication (ca.mtimes)
+    obj += ca.mtimes(ca.mtimes((st-P[n_states:]).T,Q),st-P[n_states:]) + ca.mtimes(ca.mtimes(con.T,R),con) # Objective function summation over N iterations
+    # obj += (st-P[n_states:]).T @ Q @ (st-P[n_states:])+con.T @ R @ con # @ represents matrix mulitiplication (ca.mtimes)
 
 # Compute constraints - box constraints due to map margins (x,y) -> cannot be outside of map margins
 for k in range(N+1):
