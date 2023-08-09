@@ -33,7 +33,7 @@ def DM2Arr(dm):
 # Setting up simulation parameters:
 
 T = 0.2 # Sampling time in seconds
-N = 25 # Prediction horizon
+N = 3 # Prediction horizon
 sim_time = 20 #Maximum simulation time
 # Prediction time = 0.2*3 = 0.6 seconds
 rob_diam = 0.3 # Robot dimensions
@@ -88,20 +88,22 @@ X = ca.SX.sym('X',n_states,(N+1))
 
 X[:,0] = P[0:n_states] # Initial state
 
-for k in range(N):
-    st = X[:,k] # Previous state extracted from X
-    con = U[:,k] # Control input extracted from U
-    f_value = f(st,con) # Pass input for function f, the output of which is RHS
-    st_next = st+(T*f_value) #X0+dt*RHS
-    X[:,k+1] = st_next # X matrix is now populated based on function f
+## In multistep problem this is not required since we are optimizing for X also
+
+# for k in range(N):
+#     st = X[:,k] # Previous state extracted from X
+#     con = U[:,k] # Control input extracted from U
+#     f_value = f(st,con) # Pass input for function f, the output of which is RHS
+#     st_next = st+(T*f_value) #X0+dt*RHS
+#     X[:,k+1] = st_next # X matrix is now populated based on function f
 
 # Function to get the optimal trajectory knowing the optimal solution
-ff = ca.Function('ff',[U,P],[X])
+# ff = ca.Function('ff',[U,P],[X])
 
 # Calculating the objective function
 
 obj = 0 # Objective function
-g = [] # constraints vector
+g = X[:, 0] - P[:n_states] # Constraints in the equation
 
 # Q and R are diagonal matrices used to tune the controller
 Q11 = 1.0 
@@ -120,15 +122,16 @@ for k in range(N):
     # P0,P1,P2 - stores the initial state and P3,P4,P5 stores the reference state
     obj += ca.mtimes(ca.mtimes((st-P[n_states:]).T,Q),st-P[n_states:]) + ca.mtimes(ca.mtimes(con.T,R),con) # Objective function summation over N iterations
     # obj += (st-P[n_states:]).T @ Q @ (st-P[n_states:])+con.T @ R @ con # @ represents matrix mulitiplication (ca.mtimes)
-
-# Compute constraints - box constraints due to map margins (x,y) -> cannot be outside of map margins
-for k in range(N+1):
-    g = ca.vertcat(g,X[0,k]) # state x
-    g = ca.vertcat(g,X[1,k]) # state y
+    
+    # The following lines are added for multi-shooting 
+    f_value = f(st,con)
+    st_next = X[:, k+1]
+    st_next_fwd_euler = st+(T*f_value)
+    g = ca.vertcat(g,st_next-st_next_fwd_euler)
 
 # Defining the non-linear programming structure
-
-opt_variables = ca.vertcat(U.reshape((-1,1))) # Reshape U from a 2D array to a vector using Casadi reshape
+opt_variables = ca.vertcat(X.reshape((-1,1)),
+                            U.reshape((-1,1))) # Reshape U from a 2D array to a vector using Casadi reshape
 
 nlp_prob = {
     'f':obj,
@@ -150,17 +153,23 @@ opts = {
 solver = ca.nlpsol('solver','ipopt',nlp_prob,opts)
 
 # Setting maximum and minimum for [v,omega,v,omega,v,omega]
+
 args = {
     # Inequality constraints (state constraints)
-    'lbg' : -2, # Lower bound of states x and y
-    'ubg' : 2, # Upper bound of states x and y 
+    'lbg' : np.zeros(n_states*(N+1)), # Lower bound of states x and y
+    'ubg' : np.zeros(n_states*(N+1)), # Upper bound of states x and y 
     # Input constraints
-    'lbx' : [v_min]*(2*N),
-    'ubx' : [v_max]*(2*N)
+    'lbx' : np.zeros(n_states*(N+1)+(n_controls*N)),
+    'ubx' : np.zeros(n_states*(N+1)+(n_controls*N))
 }
+# State constraints for x, y, and theta
+args['lbx'] = [-2 if i % 3 == 0 else (-2 if (i-1) % 3 == 0 else -np.inf) for i in range(3*(N+1))]
+args['ubx'] = [2 if i % 3 == 0 else (2 if (i-1) % 3 == 0 else np.inf) for i in range(3*(N+1))]
 
-args['lbx'][1::2] = [omega_min]*N
-args['ubx'][1::2] = [omega_max]*N
+# Input constraints for v and omega
+args['lbx'] += [v_min if i % 2 == 0 else omega_min for i in range(2*N)]
+args['ubx'] += [v_max if i % 2 == 0 else omega_max for i in range(2*N)]
+
 
 # Simulation Loop
 t0 = 0
@@ -189,7 +198,9 @@ if __name__ == '__main__':
             xs     # target state
             )
         # optimization variable current state as a 1D vector
-        args['x0'] = ca.reshape(u0,n_controls*N,1)
+        args['x0'] = ca.vertcat(
+            ca.reshape(X0, n_states*(N+1),1),
+            ca.reshape(u0,n_controls*N,1))
 
         sol = solver(x0=args['x0'], 
                     lbx = args['lbx'], 
@@ -202,7 +213,6 @@ if __name__ == '__main__':
         u = ca.reshape(sol['x'],n_controls, N)# Reshape from vector to matrix
         # Compute optimal solution trajectory
         # Compute state given new control input
-        ff_value = ff(u, args['p'])
 
         cat_controls = np.vstack((
             cat_controls,
