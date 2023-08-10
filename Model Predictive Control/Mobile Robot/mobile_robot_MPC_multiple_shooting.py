@@ -14,7 +14,7 @@ y_init = 0
 theta_init = 0
 x_target = 1.5
 y_target = 1.5
-theta_target = ca.pi
+theta_target = 0
 
 def shift_timestep(step_horizon, t0, state_init, u, f):
     f_value = f(state_init, u[:, 0])
@@ -33,7 +33,7 @@ def DM2Arr(dm):
 # Setting up simulation parameters:
 
 T = 0.2 # Sampling time in seconds
-N = 3 # Prediction horizon
+N = 10 # Prediction horizon
 sim_time = 20 #Maximum simulation time
 # Prediction time = 0.2*3 = 0.6 seconds
 rob_diam = 0.3 # Robot dimensions
@@ -86,8 +86,6 @@ X = ca.SX.sym('X',n_states,(N+1))
 
 # Compute solution symbolically
 
-X[:,0] = P[0:n_states] # Initial state
-
 ## In multistep problem this is not required since we are optimizing for X also
 
 # for k in range(N):
@@ -123,10 +121,19 @@ for k in range(N):
     obj += ca.mtimes(ca.mtimes((st-P[n_states:]).T,Q),st-P[n_states:]) + ca.mtimes(ca.mtimes(con.T,R),con) # Objective function summation over N iterations
     # obj += (st-P[n_states:]).T @ Q @ (st-P[n_states:])+con.T @ R @ con # @ represents matrix mulitiplication (ca.mtimes)
     
-    # The following lines are added for multi-shooting 
-    f_value = f(st,con)
+    # The following lines are added for multi-shooting using Forward-Euler
+    # f_value = f(st,con)
+    # st_next = X[:, k+1]
+    # st_next_fwd_euler = st+(T*f_value)
+    # g = ca.vertcat(g,st_next-st_next_fwd_euler)
+
+    # The following lines are added for multi-shooting using RK45
+    k1 = f(st,con)
+    k2 = f(st+((T/2)*k1),con)
+    k3 = f(st+((T/2)*k2),con)
+    k4 = f(st+(T*k3),con)
     st_next = X[:, k+1]
-    st_next_fwd_euler = st+(T*f_value)
+    st_next_fwd_euler = st+(T/6)*(k1+2*k2+2*k3+k4)
     g = ca.vertcat(g,st_next-st_next_fwd_euler)
 
 # Defining the non-linear programming structure
@@ -170,7 +177,6 @@ args['ubx'] = [2 if i % 3 == 0 else (2 if (i-1) % 3 == 0 else np.inf) for i in r
 args['lbx'] += [v_min if i % 2 == 0 else omega_min for i in range(2*N)]
 args['ubx'] += [v_max if i % 2 == 0 else omega_max for i in range(2*N)]
 
-
 # Simulation Loop
 t0 = 0
 
@@ -210,7 +216,8 @@ if __name__ == '__main__':
                     p= args['p'])
         
         # Extract the control input
-        u = ca.reshape(sol['x'],n_controls, N)# Reshape from vector to matrix
+        u = ca.reshape(sol['x'][n_states * (N + 1):], n_controls, N)
+        X0 = ca.reshape(sol['x'][: n_states * (N+1)], n_states, N+1)
         # Compute optimal solution trajectory
         # Compute state given new control input
 
@@ -221,7 +228,7 @@ if __name__ == '__main__':
 
         cat_states = np.dstack((
             cat_states,
-            DM2Arr(ff_value)
+            DM2Arr(X0)
         ))
 
         t = np.vstack((

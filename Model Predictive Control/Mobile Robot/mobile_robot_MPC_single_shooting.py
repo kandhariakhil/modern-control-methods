@@ -14,7 +14,7 @@ y_init = 0
 theta_init = 0
 x_target = 1.5
 y_target = 1.5
-theta_target = ca.pi
+theta_target = 0
 
 def shift_timestep(step_horizon, t0, state_init, u, f):
     f_value = f(state_init, u[:, 0])
@@ -33,7 +33,7 @@ def DM2Arr(dm):
 # Setting up simulation parameters:
 
 T = 0.2 # Sampling time in seconds
-N = 25 # Prediction horizon
+N = 100 # Prediction horizon
 sim_time = 20 #Maximum simulation time
 # Prediction time = 0.2*3 = 0.6 seconds
 rob_diam = 0.3 # Robot dimensions
