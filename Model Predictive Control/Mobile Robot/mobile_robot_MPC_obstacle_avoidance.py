@@ -6,7 +6,7 @@ import time
 from math import *
 import matplotlib.pyplot as plt
 
-from draw_sim import simulate
+from draw_sim_obs import simulate
 
 #Initial and Final states
 x_init = 0
@@ -33,7 +33,7 @@ def DM2Arr(dm):
 # Setting up simulation parameters:
 
 T = 0.2 # Sampling time in seconds
-N = 10 # Prediction horizon
+N = 3 # Prediction horizon
 sim_time = 20 #Maximum simulation time
 # Prediction time = 0.2*3 = 0.6 seconds
 rob_diam = 0.3 # Robot dimensions
@@ -136,6 +136,13 @@ for k in range(N):
     st_next_rk45 = st+(T/6)*(k1+2*k2+2*k3+k4)
     g = ca.vertcat(g,st_next-st_next_rk45)
 
+# Add constraints for collision avoidance
+obs_x = 0.5 # in m
+obs_y = 0.5 # in m
+obs_diam = 0.3 # in m
+for k in range(N+1):
+    g = ca.vertcat(g,(-ca.sqrt((X[0,k]-obs_x)*(X[0,k]-obs_x)+(X[1,k]-obs_y)*(X[1,k]-obs_y))+(obs_diam/2+rob_diam/2)))
+
 # Defining the non-linear programming structure
 opt_variables = ca.vertcat(X.reshape((-1,1)),
                             U.reshape((-1,1))) # Reshape U from a 2D array to a vector using Casadi reshape
@@ -163,12 +170,17 @@ solver = ca.nlpsol('solver','ipopt',nlp_prob,opts)
 
 args = {
     # Inequality constraints (state constraints)
-    'lbg' : np.zeros(n_states*(N+1)), # Lower bound of states x and y
-    'ubg' : np.zeros(n_states*(N+1)), # Upper bound of states x and y 
+    'lbg' : np.zeros((n_states+1)*(N+1)), # Lower bound of states x and y
+    'ubg' : np.zeros((n_states+1)*(N+1)), # Upper bound of states x and y 
     # Input constraints
     'lbx' : np.zeros(n_states*(N+1)+(n_controls*N)),
     'ubx' : np.zeros(n_states*(N+1)+(n_controls*N))
 }
+
+# Inequality constraints for g
+args['lbg'][3*(N+1):] = -np.inf
+args['ubg'][3*(N+1):] = 0
+
 # State constraints for x, y, and theta
 args['lbx'] = [-2 if i % 3 == 0 else (-2 if (i-1) % 3 == 0 else -np.inf) for i in range(3*(N+1))]
 args['ubx'] = [2 if i % 3 == 0 else (2 if (i-1) % 3 == 0 else np.inf) for i in range(3*(N+1))]
@@ -265,4 +277,4 @@ if __name__ == '__main__':
     print('final error: ', ss_error)
     # simulate
     simulate(cat_states, cat_controls, times, T, N,
-            np.array([x_init, y_init, theta_init, x_target, y_target, theta_target]), save=False)
+            np.array([x_init, y_init, theta_init, x_target, y_target, theta_target]), save=False, obs_x=obs_x, obs_y=obs_y, obs_dia=obs_diam)
