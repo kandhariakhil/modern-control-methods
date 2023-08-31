@@ -76,7 +76,6 @@ def solve_mpc(theta_ref, theta, dtheta, tau_init, l, k, m, g, dt, Q11, Q22, R, N
     result = minimize(mpc_cost, tau_init, args=(theta_ref,theta0,dtheta0, l, k, m, g, dt, Q11, Q22, R, N), bounds=bounds, constraints=delta_tau_constraint)
 
     tau_mpc = result.x
-    print(tau_mpc)
     return tau_mpc
 
 # Simulation Initialization
