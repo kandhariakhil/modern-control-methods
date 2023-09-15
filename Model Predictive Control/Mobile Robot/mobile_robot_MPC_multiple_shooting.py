@@ -118,7 +118,7 @@ for k in range(N):
     con = U[:,k]
     # Note: Casadi multiplication is using mtimes and the .T transposes the array
     # P0,P1,P2 - stores the initial state and P3,P4,P5 stores the reference state
-    obj += ca.mtimes(ca.mtimes((st-P[n_states:]).T,Q),st-P[n_states:]) + ca.mtimes(ca.mtimes(con.T,R),con) # Objective function summation over N iterations
+    obj += ca.mtimes([(st-P[n_states:]).T,Q,(st-P[n_states:])]) + ca.mtimes([con.T,R,con]) # Objective function summation over N iterations
     # obj += (st-P[n_states:]).T @ Q @ (st-P[n_states:])+con.T @ R @ con # @ represents matrix mulitiplication (ca.mtimes)
     
     # The following lines are added for multi-shooting using Forward-Euler
