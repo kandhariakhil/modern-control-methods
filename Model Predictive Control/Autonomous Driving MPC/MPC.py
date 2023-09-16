@@ -14,10 +14,10 @@ y_init = 0
 psi_init = 0
 v_init = 0
 
-x_target = 10
-y_target = 10
+x_target = 30
+y_target = 30
 psi_target = pi/2
-v_target = 0
+v_target = 0.00
 
 def shift_timestep(step_horizon, t0, state_init, u, f):
     f_value = f(state_init, u[:, 0])
@@ -34,17 +34,17 @@ def shift_timestep(step_horizon, t0, state_init, u, f):
 def DM2Arr(dm):
     return np.array(dm.full())
 
-dt = 0.2
-N = 20
+dt = 0.25
+N = 10
 sim_time = 200
 
 Lf = 2.67
 
-x_max = 20
-x_min = -20
+x_max = 40
+x_min = -40
 
-y_max = 20
-y_min = -20
+y_max = 40
+y_min = -40
 
 psi_max = np.inf
 psi_min = -np.inf
@@ -53,13 +53,13 @@ v_max = 25
 v_min = -4
 
 a_max = 3
-a_min = -4
+a_min = -3
 
 delta_max = radians(30)
 delta_min = radians(-30)
 
 jerk_max = 0.6
-jerk_min = -1
+jerk_min = -0.6
 
 d_delta_max = radians(20)
 d_delta_min = radians(-20)
@@ -110,20 +110,20 @@ X = ca.SX.sym('X',n_states,(N+1))
 obj = 0
 g = X[:,0]-P[:n_states]
 
-Q11 = 8.0
-Q22 = 8.0
-Q33 = 1.0
-Q44 = 10.0
+Q11 = 10.0
+Q22 = 10.0
+Q33 = 5.0
+Q44 = 5.0
 
 Q = ca.diagcat(Q11,Q22,Q33,Q44)
 
 R11 = 0.5
-R22 = 0.05
+R22 = 2.0
 
 R = ca.diagcat(R11,R22)
 
-S11 = 10
-S22 = 0.5
+S11 = 1
+S22 = 0.05
 
 S = ca.diagcat(S11,S22)
 
@@ -222,7 +222,7 @@ times = np.array([[0]])
 
 if __name__ == '__main__':
     main_loop = time.time()
-    while (ca.norm_2(x0-xs) > 1e-2) and mpc_iter < sim_time/dt:
+    while (ca.norm_2(x0-xs) > 1e-1) and mpc_iter < sim_time/dt:
         t1 = time.time()
         args['p'] = ca.vertcat(
             x0,    # current state
