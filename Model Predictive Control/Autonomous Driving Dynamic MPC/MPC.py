@@ -96,12 +96,12 @@ n_controls = controls.numel()
 front_force = calFrontForce(mp['lf'], mp['Bf'], mp['Cf'], mp['Df'], omega, vx, vy, delta)
 front_force_func = ca.Function('front_force_func', [omega, vx, vy, delta], [front_force])
 
-rear_force = calRearForce(mp['lf'], mp['Bf'], mp['Cf'], mp['Df'], omega, vx, vy)
+rear_force = calRearForce(mp['lr'], mp['Br'], mp['Cr'], mp['Dr'], omega, vx, vy)
 rear_force_func = ca.Function('rear_force_func', [omega, vx, vy], [rear_force])
 
 long_force = calLongForce(mp['cm1'],mp['cm2'],mp['cr'],mp['cd'],vx,d)
 long_force_func = ca.Function('long_force',[vx,d],[long_force])
-print(mp['Iz'])
+
 rhs = ca.vertcat(
     vx*ca.cos(phi)-vy*ca.sin(phi),
     vx*ca.sin(phi)+vy*ca.cos(phi),
@@ -173,8 +173,8 @@ opts = {
     'ipopt': {
         'max_iter':100,
         'print_level':0,
-        'acceptable_tol':1e-8,
-        'acceptable_obj_change_tol':1e-6
+        'acceptable_tol':1e-4,
+        'acceptable_obj_change_tol':1e-4
     },
     'print_time':0
 }
@@ -211,6 +211,7 @@ for i in range(n_states*(N+1),len(args['lbx'])-(n_controls-1),n_controls):
     args['ubx'][i] = lim['d_max']
     args['ubx'][i+1] = lim['delta_max']
 
+
 # Simulation Loop
 t0 = 0
 
@@ -229,6 +230,8 @@ cat_controls = DM2Arr(u0[:,0]) # Store control actions
 state_outputs = DM2Arr(x0)
 times = np.array([[0]])
 
+jac_g_x = ca.jacobian(g, opt_variables)
+jac_g_x_function = ca.Function('jac_g_x_function', [opt_variables, P], [jac_g_x])
 
 if __name__ == '__main__':
     main_loop = time.time()
@@ -242,7 +245,7 @@ if __name__ == '__main__':
         args['x0'] = ca.vertcat(
             ca.reshape(X0, n_states*(N+1),1),
             ca.reshape(u0,n_controls*N,1))
-
+        
         sol = solver(x0=args['x0'], 
                     lbx = args['lbx'], 
                     ubx = args['ubx'], 
@@ -255,6 +258,9 @@ if __name__ == '__main__':
         X0 = ca.reshape(sol['x'][: n_states * (N+1)], n_states, N+1)
         # Compute optimal solution trajectory
         # Compute state given new control input
+        
+        current_jac_g_x = jac_g_x_function(args['x0'], args['p'])
+        print(f"Jacobian of g at iteration {mpc_iter}:", DM2Arr(current_jac_g_x))
 
         cat_controls = np.vstack((
             cat_controls,
@@ -313,3 +319,15 @@ if __name__ == '__main__':
     # simulate
     simulate(cat_states, cat_controls, times, dt, N,
             np.array([x_init, y_init, phi_init, x_target, y_target, phi_target]), save=False)
+'''
+if __name__ == '__main__':
+    test_omega = 0.1
+    test_vx = 5.0
+    test_vy = 0.2
+    test_delta = 0.05
+    test_d = 0.1
+
+    print("Front Force:", calFrontForce(mp['lf'], mp['Bf'], mp['Cf'], mp['Df'], test_omega, test_vx, test_vy, test_delta))
+    print("Rear Force:", calRearForce(mp['lr'], mp['Br'], mp['Cr'], mp['Dr'], test_omega, test_vx, test_vy))
+    print("Longitudinal Force:", calLongForce(mp['cm1'], mp['cm2'], mp['cr'], mp['cd'], test_vx, test_d))
+'''
