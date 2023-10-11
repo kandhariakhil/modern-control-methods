@@ -25,18 +25,21 @@ def shift_timestep(step_horizon, t0, state_init, u, f):
 def DM2Arr(dm):
     return np.array(dm.full())
 
+# Ff,y
 def calFrontForce(lf, B, C, D, omega, vx, vy, delta):
     alpha = -ca.arctan2(omega * lf + vy, vx) + delta
     frontForce = D * ca.sin(C * ca.arctan(B * alpha))
     
     return frontForce
 
+# Fr,y
 def calRearForce(lr, B, C, D, omega, vx, vy):
     alpha = ca.arctan2(omega * lr - vy, vx)
     rearForce = D * ca.sin(C * ca.arctan(B * alpha))
     
     return rearForce
 
+# Fr,x
 def calLongForce(cm1,cm2,cr,cd,vx,d):
     longForce = (cm1-cm2*vx)*d-cr-cd*vx*vx
     
@@ -59,7 +62,7 @@ omega_target = 0.0
 parameters = importParameters()
 
 dt = 0.25
-N = 3
+N = 1
 sim_time = 100
 
 mp = parameters.getModelParameters()
@@ -173,8 +176,8 @@ opts = {
     'ipopt': {
         'max_iter':100,
         'print_level':0,
-        'acceptable_tol':1e-4,
-        'acceptable_obj_change_tol':1e-4
+        'acceptable_tol':1e-8,
+        'acceptable_obj_change_tol':1e-6
     },
     'print_time':0
 }
@@ -211,6 +214,7 @@ for i in range(n_states*(N+1),len(args['lbx'])-(n_controls-1),n_controls):
     args['ubx'][i] = lim['d_max']
     args['ubx'][i+1] = lim['delta_max']
 
+print(args)
 
 # Simulation Loop
 t0 = 0
@@ -258,9 +262,9 @@ if __name__ == '__main__':
         X0 = ca.reshape(sol['x'][: n_states * (N+1)], n_states, N+1)
         # Compute optimal solution trajectory
         # Compute state given new control input
-        
-        current_jac_g_x = jac_g_x_function(args['x0'], args['p'])
-        print(f"Jacobian of g at iteration {mpc_iter}:", DM2Arr(current_jac_g_x))
+
+        # current_jac_g_x = jac_g_x_function(args['x0'], args['p'])
+        # print(f"Jacobian of g at iteration {mpc_iter}:", DM2Arr(current_jac_g_x))
 
         cat_controls = np.vstack((
             cat_controls,

@@ -3,35 +3,35 @@ from math import *
 
 class importParameters:
     def __init__(self):
-        self.m = 1573
-        self.Iz = 2873
-        self.lf = 1.35
-        self.lr = 1.35
+        self.m = 0.041
+        self.Iz = 27.8e-6
+        self.lf = 0.029
+        self.lr = 0.033
 
         self.wf = self.lr/(self.lf+self.lr)
         self.wr = self.lf/(self.lf+self.lr)
 
-        self.cm1 = 17303
-        self.cm2 = 175
-        self.cr = 120
-        self.cd = 0.5*1.225*0.35*2.5
+        self.cm1 = 0.287
+        self.cm2 = 0.0545
+        self.cr = 0.0518
+        self.cd = 0.00035
 
-        self.Br = 13
-        self.Cr = 2
-        self.Dr = self.wf*self.m*9.81*1.2
+        self.Br = 3.3852
+        self.Cr = 1.2691
+        self.Dr = 0.1737
 
-        self.Bf = 13
-        self.Cf = 2
-        self.Df = self.wr*self.m*9.81*1.2
+        self.Bf = 2.579
+        self.Cf = 1.2
+        self.Df = 0.192
 
-        self.L = 5
-        self.W = 2.5
+        self.L = 0.12
+        self.W = 0.06
 
-        self.x_max = 40
-        self.x_min = -40
+        self.x_max = 400
+        self.x_min = -400
 
-        self.y_max = 40
-        self.y_min = -40
+        self.y_max = 400
+        self.y_min = -400
 
         self.phi_max = np.inf
         self.phi_min = -np.inf
@@ -42,8 +42,8 @@ class importParameters:
         self.vy_max = 5
         self.vy_min = -5
 
-        self.omega_max = radians(10)
-        self.omega_min = -radians(10)
+        self.omega_max = np.inf
+        self.omega_min = -np.inf
 
         self.d_max = 1
         self.d_min = -0.1
