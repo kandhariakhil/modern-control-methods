@@ -10,6 +10,10 @@ from importParameters import importParameters
 
 from draw_sim import simulate
 
+parameters = importParameters()
+mp = parameters.getModelParameters()
+lim = parameters.getLimits()
+
 def shift_timestep(step_horizon, t0, state_init, u, f):
     f_value = f(state_init, u[:, 0])
     next_state = ca.DM.full(state_init + (step_horizon * f_value))
@@ -26,22 +30,22 @@ def DM2Arr(dm):
     return np.array(dm.full())
 
 # Ff,y
-def calFrontForce(lf, B, C, D, omega, vx, vy, delta):
-    alpha = -ca.arctan2(omega * lf + vy, vx) + delta
-    frontForce = D * ca.sin(C * ca.arctan(B * alpha))
+def calFrontForce(omega, vx, vy, delta):
+    alpha = -ca.arctan2(((omega * mp['lf']) + vy), vx) + delta
+    frontForce = mp['Df'] * (ca.sin(mp['Cf'] * ca.arctan(mp['Bf'] * alpha)))
     
     return frontForce
 
 # Fr,y
-def calRearForce(lr, B, C, D, omega, vx, vy):
-    alpha = ca.arctan2(omega * lr - vy, vx)
-    rearForce = D * ca.sin(C * ca.arctan(B * alpha))
+def calRearForce(omega, vx, vy):
+    alpha = ca.arctan2(((omega * mp['lr']) - vy), vx)
+    rearForce = mp['Dr'] * ca.sin(mp['Cr'] * ca.arctan(mp['Br'] * alpha))
     
     return rearForce
 
 # Fr,x
-def calLongForce(cm1,cm2,cr,cd,vx,d):
-    longForce = (cm1-cm2*vx)*d-cr-cd*vx*vx
+def calLongForce(vx,d):
+    longForce = (mp['cm1']-mp['cm2']*vx)*d-mp['Cr']-mp['cd']*vx*vx
     
     return longForce
 
@@ -59,14 +63,9 @@ vx_target = 0.0
 vy_target = 0.0
 omega_target = 0.0
 
-parameters = importParameters()
-
 dt = 0.25
 N = 1
 sim_time = 100
-
-mp = parameters.getModelParameters()
-lim = parameters.getLimits()
 
 x= ca.SX.sym('x')
 y = ca.SX.sym('y')
@@ -96,13 +95,13 @@ controls = ca.vertcat(
 
 n_controls = controls.numel()
 
-front_force = calFrontForce(mp['lf'], mp['Bf'], mp['Cf'], mp['Df'], omega, vx, vy, delta)
+front_force = calFrontForce(omega, vx, vy, delta)
 front_force_func = ca.Function('front_force_func', [omega, vx, vy, delta], [front_force])
 
-rear_force = calRearForce(mp['lr'], mp['Br'], mp['Cr'], mp['Dr'], omega, vx, vy)
+rear_force = calRearForce(omega, vx, vy)
 rear_force_func = ca.Function('rear_force_func', [omega, vx, vy], [rear_force])
 
-long_force = calLongForce(mp['cm1'],mp['cm2'],mp['cr'],mp['cd'],vx,d)
+long_force = calLongForce(vx,d)
 long_force_func = ca.Function('long_force',[vx,d],[long_force])
 
 rhs = ca.vertcat(
@@ -125,22 +124,22 @@ X = ca.SX.sym('X',n_states,N+1)
 obj = 0
 g = X[:,0]-P[:n_states]
 
-Q11 = 10.0
-Q22 = 10.0
-Q33 = 5.0
-Q44 = 5.0
-Q55 = 2.0
-Q66 = 2.0
+Q11 = 1.0
+Q22 = 1.0
+Q33 = 1.0
+Q44 = 1.0
+Q55 = 1.0
+Q66 = 1.0
 
 Q = ca.diagcat(Q11,Q22,Q33,Q44,Q55,Q66)
 
-R11 = 0.5
-R22 = 2.0
+R11 = 1.0
+R22 = 1.0
 
 R = ca.diagcat(R11,R22)
 
-S11 = 1
-S22 = 0.05
+S11 = 1.0
+S22 = 1.0
 
 S = ca.diagcat(S11,S22)
 
