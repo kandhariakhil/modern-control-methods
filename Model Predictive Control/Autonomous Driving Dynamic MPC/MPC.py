@@ -31,15 +31,15 @@ def DM2Arr(dm):
 
 # Ff,y
 def calFrontForce(omega, vx, vy, delta):
-    alpha = -ca.arctan2(((omega * mp['lf']) + vy), vx) + delta
-    frontForce = mp['Df'] * (ca.sin(mp['Cf'] * ca.arctan(mp['Bf'] * alpha)))
+    alpha = -ca.atan2(((omega * mp['lf']) + vy), vx) + delta
+    frontForce = mp['Df'] * (ca.sin(mp['Cf'] * ca.atan2(mp['Bf'] * alpha,1)))
     
     return frontForce
 
 # Fr,y
 def calRearForce(omega, vx, vy):
-    alpha = ca.arctan2(((omega * mp['lr']) - vy), vx)
-    rearForce = mp['Dr'] * ca.sin(mp['Cr'] * ca.arctan(mp['Br'] * alpha))
+    alpha = ca.atan2(((omega * mp['lr']) - vy), vx)
+    rearForce = mp['Dr'] * ca.sin(mp['Cr'] * ca.atan2(mp['Br'] * alpha,1))
     
     return rearForce
 
