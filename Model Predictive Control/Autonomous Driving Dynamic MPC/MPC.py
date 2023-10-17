@@ -49,19 +49,19 @@ def calLongForce(vx,d):
     
     return longForce
 
-x_init = 0.0
-y_init = 0.0
+x_init = 1.0
+y_init = 1.0
 phi_init = 0.0
 vx_init = 0.0
 vy_init = 0.0
-omega_init = 0.0
+omega_init = 0.01
 
 x_target = 30.0
 y_target = 30.0
 phi_target = pi/2
 vx_target = 0.0
 vy_target = 0.0
-omega_target = 0.0
+omega_target = 0.01
 
 dt = 0.25
 N = 1
